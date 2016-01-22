@@ -126,7 +126,8 @@ namespace Ogre
 		sprintf(idbuffer, "ogg_video:%ul", ++x);
 		std::string id=idbuffer;
 		TheoraVideoClip* clip=theoraVideoManager->createVideoClip(new OgreTheoraDataStream(mInputFileName,group_name,id),TH_BGRA,0,1);
-		int w=nextPow2(clip->getWidth()),h=nextPow2(clip->getHeight());
+		int wi = clip->getWidth(), hi = clip->getHeight();
+		int w=nextPow2(wi),h=nextPow2(hi);
 
 		TexturePtr t = TextureManager::getSingleton().createManual(id,group_name,TEX_TYPE_2D,w,h,1,0,PF_X8R8G8B8,TU_DYNAMIC_WRITE_ONLY);
 		
@@ -135,7 +136,7 @@ namespace Ogre
 		// clear it to black
 
 		unsigned char* texData=(unsigned char*) t->getBuffer()->lock(HardwareBuffer::HBL_DISCARD);
-		memset(texData,255,w*h*4);
+		memset(texData,0,w*h*4);
 		t->getBuffer()->unlock();
 		movies[key].push_back(video_data(t, clip));
 		if (mMode == TextureEffectPlay_ASAP) {
@@ -157,14 +158,14 @@ namespace Ogre
 
 		//Now, attach the texture to the material texture unit (single layer) and setup properties
 		ts->setTextureName(id,TEX_TYPE_2D);
-		ts->setTextureFiltering(Ogre::TFO_NONE);
-		//ts->setTextureFiltering(FO_LINEAR, FO_LINEAR, FO_NONE);
+		//ts->setTextureFiltering(Ogre::TFO_NONE);
+		ts->setTextureFiltering(FO_LINEAR, FO_LINEAR, FO_NONE);
 		ts->setTextureAddressingMode(TextureUnitState::TAM_CLAMP);
 
 		// scale tex coords to fit the 0-1 uv range
-		//Matrix4 mat=Matrix4::IDENTITY;
-		//mat.setScale(Vector3((float) clip->getWidth()/w, (float) clip->getHeight()/h,1));
-		//ts->setTextureTransform(mat);
+		Matrix4 mat=Matrix4::IDENTITY;
+		mat.setScale(Vector3((float) clip->getWidth()/w, (float) clip->getHeight()/h,1));
+		ts->setTextureTransform(mat);
 	}
 
 	void OgreTheoraVideoManager::destroyAdvancedTexture(const String& material_name, const String& group_name)
@@ -204,16 +205,15 @@ namespace Ogre
 				video_data &dat = *i2;
 				if (dat.clip) {
 					f = dat.clip->getNextFrame();
-					if (f && false)
+					if (f)
 					{
-						int w = f->getStride(), h = f->getHeight();
 						TexturePtr t = dat.texture;
-
 						unsigned char *texData = (unsigned char*)t->getBuffer()->lock(HardwareBuffer::HBL_DISCARD);
+						size_t vos = t->getWidth()*t->getHeight()*4;
+						size_t vis = f->getStride()*f->getHeight()*4;
 						unsigned char *videoData = f->getBuffer();
-
-						memcpy(texData, videoData, w*h * 4);
-						memset(texData, 255, w*h * 4);
+						memcpy(texData, videoData, vis);
+						memset(texData+vis, 0, vos-vis);
 						t->getBuffer()->unlock();
 						dat.clip->popFrame();
 					}
@@ -224,5 +224,4 @@ namespace Ogre
 		}
 		return true;
 	}
-
 } // end namespace Ogre
